@@ -14,30 +14,30 @@ mensajes_salida = queue.Queue()
 abierto = False
 
 # Contador de lugares disponibles
-lugares_disp
+lugares_disp = 0
 
 # Semáforo binario para proteger lugares_disp
 mutex_lugares = threading.Lock()
 
 # Lista de threads de entradas
-entradas
+entradas = []
 
 # Cuando un alguien usa una entrada se bloquea, para eso es esta lista de mutex
 # Cada mutex corresponde con la entrada i
-mutex_entradas
+mutex_entradas = []
 
 # Lista de banderas para saber si un carro cruza por el laser de entrada
-cruzando_laser_entrada
+cruzando_laser_entrada = []
 
 # Lista de threads de salidas
-salidas
+salidas = []
 
 # Cuando un alguien usa una salida se bloquea, para eso es esta lista de mutex
 # Cada mutex corresponde con la salida i
-mutex_salidas
+mutex_salidas = []
 
 # Lista de banderas para saber si un carro cruza por el laser de salida
-cruzando_laser_salida
+cruzando_laser_salida = []
 
 '''
  + - + - + - + - + - + - + - + Entrada + - + - + - + - + - + - + - + - +
@@ -61,7 +61,19 @@ def oprime_boton(hora, num_entrada):
 
 
 
-def laser_off_e(hora, num_entrada)
+def recoge_tarjeta(hora, num_entrada): # TODO: completar la función
+    pass
+'''
+    global mensajes_salida, cruzando_laser_entrada
+
+    cruzando_laser_entrada[num_entrada] = True
+
+    mensajes_salida.put(f'Auto pasando por entrada {num_entrada}')
+'''
+
+
+
+def laser_off_e(hora, num_entrada):
     global mensajes_salida, cruzando_laser_entrada
 
     cruzando_laser_entrada[num_entrada] = True
@@ -70,7 +82,7 @@ def laser_off_e(hora, num_entrada)
 
 
 
-def laser_on_e(hora, num_entrada)
+def laser_on_e(hora, num_entrada):
     global mutex_entradas, mensajes_salida, cruzando_laser_entrada
 
     if cruzando_laser_entrada[num_entrada]:
@@ -85,11 +97,25 @@ def laser_on_e(hora, num_entrada)
 
 # Función base para thread de entrada
 
-def entrada(hora, num_entrada):
+def entrada(num_entrada):
     global abierto, mensajes_salida
 
     while abierto:
-        pass
+        mensaje = mensajes_entrada.get()
+
+        if mensaje[2] == num_entrada:
+            if mensaje[1] == 'oprimeBoton':
+                oprimeBoton(mensaje[0], num_entrada)
+            elif mensaje[1] == 'recogeTarjeta': # TODO: completar la función
+                pass
+            elif mensaje[1] == 'laserOffE':
+                laser_off_e(mensaje[0], num_entrada)
+            elif mensaje[1] == 'laserOnE':
+                laser_on_e(mensaje[0], num_entrada)
+        else:
+            mensajes_entrada.put(mensaje)
+
+
 
 '''
  + - + - + - + - + - + - + - + Salida + - + - + - + - + - + - + - + - +
@@ -146,7 +172,17 @@ def salida(num_salida):
     global abierto
 
     while abierto:
-        pass
+        mensaje = mensajes_entrada.get()
+
+        if mensaje[2] == num_entrada:
+            if mensaje[1] == 'meteTarjeta':
+                oprimeBoton(mensaje[0], num_entrada)
+            elif mensaje[1] == 'laserOffS':
+                laser_off_e(mensaje[0], num_entrada)
+            elif mensaje[1] == 'laserOnS':
+                laser_on_e(mensaje[0], num_entrada)
+        else:
+            mensajes_entrada.put(mensaje)
 
 '''
  + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - +
@@ -193,6 +229,183 @@ def cierre():
         salida.join()
 
 '''
+ + - + - + - + - Validación de mensajes del cliente - + - + - + - + - +
+'''
+
+class Error(Exception):
+    pass
+
+class ComandoInvalido(Error):
+    pass
+
+class FormatoInvalido(Error):
+    pass
+
+def validar_mensajes(mensaje):
+    global mensajes_salida
+
+    es_valido = True
+    args = mensaje.split(' ')
+
+    try:
+        args[0] = float(args[0])
+        try:
+            if args[1] == 'apertura':
+                try:
+                    if len(args) != 5:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de lugares en {args[1]} invalido')
+                            pass
+                        try:
+                            args[3] = int(args[3])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de puertas de entrada en {args[1]} invalido')
+                            pass
+                        try:
+                            args[4] = int(args[4])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de puertas de salida en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'oprimeBoton':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de entrada en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'recogeTarjeta':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de barrera en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'laserOffE':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de estacionamiento en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'laserOnE':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de estacionamiento en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'meteTarjeta':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de estacionamiento en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'laserOffS':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de estacionamiento en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'laserOnS':
+                try:
+                    if len(args) != 3:
+                        raise FormatoInvalido
+                    else:
+                        try:
+                            args[2] = int(args[2])
+                        except ValueError:
+                            es_valido = False
+                            mensajes_salida.put(f'Formato numero de estacionamiento en {args[1]} invalido')
+                            pass
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            elif args[1] == 'cierre':
+                try:
+                    if len(args) != 2:
+                        raise FormatoInvalido
+                except FormatoInvalido:
+                    es_valido = False
+                    mensajes_salida.put(f'Formato de mensaje {args[1]} invalido')
+                    pass
+            else:
+                raise ComandoInvalido
+        except ComandoInvalido:
+            es_valido = False
+            mensajes_salida.put(f'Comando {args[1]} invalido')
+            pass
+    except ValueError:
+        es_valido = False
+        mensajes_salida.put(f'Formato numero de lugares en {args[1]} invalido')
+        pass
+
+    return es_valido
+
+
+
+'''
  + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - + - +
 '''
 
@@ -206,8 +419,14 @@ def recibir_cliente(connection):
             datos = connection.recv(256)
             mensaje = datos.decode('utf-8')
 
-            if msg:
-                mensajes_entrada.put(mensaje)
+            if mensaje:
+                if validar_mensajes(mensaje):
+                    if not abierto and mensaje[1] == 'apertura':
+                        apertura(mensaje[2], mensaje[3], mensaje[4])
+                    elif abierto and mensaje[1] == 'cierre':
+                        cierre()
+                    else:
+                        mensajes_entrada.put(mensaje)
             else:
                 break
     finally:
