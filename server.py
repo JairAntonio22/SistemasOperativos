@@ -9,7 +9,7 @@ from tabulate import tabulate
 mensajes_entrada = queue.Queue()
 
 # Fila de mensajes a responder al cliente
-tabla = ['Timestamp', 'Comando', 'El servidor despliega', 'Libres', 'Ocupados']
+tabla = [['Timestamp', 'Comando', 'El servidor despliega', 'Libres', 'Ocupados']]
 
 # Bandera para saber si el estacionamiento está abierto
 abierto = False
@@ -57,28 +57,34 @@ def oprime_boton(hora, num_entrada):
     mutex_lugares.acquire()
 
     if lugares_libres > 0:
-        tabla.append([
+        row = [
             hora,
             f'oprimeBoton {num_entrada}',
             f'Imprimiendo tarjeta en entrada {num_entrada}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         time.sleep(5)
 
-        tabla.append([
+        row = [
             hora + 5,
             f'oprimeBoton {num_entrada}',
             f'Se imprimió tarjeta. Hora: {num_entrada}', # TODO: agregar hora
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
     else:
-        tabla.append([
+        row = [
             hora,
             f'oprimeBoton {num_entrada}',
             'Estacionamiento lleno, inténtalo después',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
     mutex_lugares.release()
 
@@ -89,21 +95,25 @@ def recoge_tarjeta(hora, num_entrada): # TODO: completar la función
 
     mutex_lugares.acquire()
 
-    tabla.append([
+    row = [
         hora,
         f'recojeTarjeta {num_entrada}',
         f'Se levanta barrera entrada {num_entrada}',
         lugares_libres,
-        CAPACIDAD - lugares_libres])
+        CAPACIDAD - lugares_libres]
+
+    tabla.append(row)
 
     time.sleep(5)
 
-    tabla.append([
+    row = [
         hora + 5,
         f'recojeTarjeta {num_entrada}',
         f'Barrera de entrada {num_entrada} levantada',
         lugares_libres,
-        CAPACIDAD - lugares_libres])
+        CAPACIDAD - lugares_libres]
+
+    tabla.append(row)
 
     mutex_lugares.release()
 
@@ -117,12 +127,14 @@ def laser_off_e(hora, num_entrada):
 
     mutex_lugares.acquire()
 
-    tabla.append([
+    row = [
         hora,
         f'laserOffE {num_entrada}',
         f'Auto pasa por entrada {num_entrada}',
         lugares_libres,
-        CAPACIDAD - lugares_libres])
+        CAPACIDAD - lugares_libres]
+
+    tabla.append(row)
 
     mutex_lugares.release()
 
@@ -137,28 +149,34 @@ def laser_on_e(hora, num_entrada):
     if cruzando_laser_entrada[num_entrada]:
         lugares_libres -= 1
 
-        tabla.append([
+        row = [
             hora,
             f'laserOnE {num_entrada}',
             f'Auto termina de pasar por entrada {num_entrada}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         time.sleep(5)
 
-        tabla.append([
+        row = [
             hora,
             f'laserOnE {num_entrada}',
             f'Se bajó barrera de entrada {num_entrada}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
     else:
-        tabla.append([
+        row = [
             hora,
             f'laserOnE {num_entrada}',
             f'Error: no hay auto en salida {num_entrada}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
     mutex_lugares.release()
     mutex_entradas[num_entrada].release()
@@ -201,26 +219,32 @@ def mete_tarjeta(hora, num_salida, pagado, hora_pago):
 
     if pagado == 1:
         if hora - hora_pago < 15:     # TODO: Hacer chequeo de hora correcto
-            tabla.append([
+            row = [
                 hora,
                 f'meteTarjeta {num_salida} {pagado} {hora_pago}',
                 f'Levantando barrera de salida {num_salida}',
                 lugares_libres,
-                CAPACIDAD - lugares_libres])
+                CAPACIDAD - lugares_libres]
+
+            tabla.append(row)
         else:
-            tabla.append([
+            row = [
                 hora,
                 f'meteTarjeta {num_salida} {pagado} {hora_pago}',
                 'Tiempo de tolerancia terminado, vuelva a pagar',
                 lugares_libres,
-                CAPACIDAD - lugares_libres])
+                CAPACIDAD - lugares_libres]
+
+            tabla.append(row)
     else:
-        tabla.append([
+        row = [
             hora,
             f'meteTarjeta {num_salida} {pagado} {hora_pago}',
             'No se ha pagado el tiempo de estancia',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
 
 
@@ -232,12 +256,14 @@ def laser_off_s(hora, num_salida):
 
     mutex_lugares.acquire()
 
-    tabla.append([
+    row = [
         hora,
         f'laserOffS {num_salida}',
         f'Auto pasando por salida {num_salida}',
         lugares_libres,
-        CAPACIDAD - lugares_libres])
+        CAPACIDAD - lugares_libres]
+
+    tabla.append(row)
 
     mutex_lugares.release()
 
@@ -254,28 +280,34 @@ def laser_on_s(hora, num_salida):
 
         mutex_lugares.release()
 
-        tabla.append([
+        row = [
             hora,
             f'laserOnS {num_salida}',
             f'Auto termina de pasar por salida {num_salida}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         time.sleep(5)
 
-        tabla.append([
+        row = [
             hora + 5,
             f'laserOnS {num_salida}',
             f'Se baja barrera en salida {num_salida}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
     else:
-        tabla.append([
+        row = [
             hora,
             f'laserOnS {num_salida}',
             f'Error: no hay auto en salida {num_salida}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
     mutex_salidas[num_salida].release()
 
@@ -314,12 +346,14 @@ def apertura(hora, num_lugares, num_entradas, num_salidas):
         abierto = True
         CAPACIDAD = lugares_libres = num_lugares
 
-        tabla.append([
+        row = [
             hora,
             f'apertura {num_lugares} {num_entradas} {num_salidas}',
             f'Auto termina de pasar por salida {num_salida}',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         for i in range(num_entradas):
             entradas[i] = threading.Thread(target=entrada, args=(i,))
@@ -335,12 +369,14 @@ def apertura(hora, num_lugares, num_entradas, num_salidas):
     else:
         mutex_lugares.acquire()
 
-        tabla.append([
+        row = [
             hora,
             f'apertura {num_lugares} {num_entradas} {num_salidas}',
             'Error: El estacionamiento ya está abierto',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         mutex_lugares.release()
 
@@ -351,16 +387,19 @@ def apertura(hora, num_lugares, num_entradas, num_salidas):
 def cierre(hora):
     global abierto, entradas, salidas
     global mutex_entradas, mutex_salidas
+    global tabla, lugares_libres, mutex_lugares, CAPACIDAD
 
     if abierto:
         abierto = False
 
-        tabla.append([
+        row = [
             hora,
             f'cierre',
             f'Se cierra estacionamiento',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         mutex_entradas = []
         mutex_salidas = []
@@ -373,12 +412,14 @@ def cierre(hora):
     else:
         mutex_lugares.acquire()
 
-        tabla.append([
+        row = [
             hora,
             f'cierre',
             'Error: No hay estacionamiento abierto',
             lugares_libres,
-            CAPACIDAD - lugares_libres])
+            CAPACIDAD - lugares_libres]
+
+        tabla.append(row)
 
         mutex_lugares.release()
 
@@ -492,7 +533,7 @@ def validar_mensajes(mensaje):
                     pass
             elif args[1] == 'meteTarjeta':
                 try:
-                    if len(args) != 3:
+                    if len(args) != 4:
                         raise FormatoInvalido
                     else:
                         try:
