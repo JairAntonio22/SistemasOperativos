@@ -50,10 +50,7 @@ cruzando_laser_salida = []
 # Funciones necesarias para entrada
 
 def oprime_boton(hora, num_entrada):
-    global mutex_entradas, mutex_lugares
-    global tabla, lugares_libres, CAPACIDAD
-
-    mutex_entradas[num_entrada].acquire()
+    mutex_entradas[num_entrada - 1].acquire()
     mutex_lugares.acquire()
 
     if lugares_libres > 0:
@@ -89,10 +86,7 @@ def oprime_boton(hora, num_entrada):
     mutex_lugares.release()
 
 
-def recoge_tarjeta(hora, num_entrada): # TODO: completar la función
-    global mutex_lugares
-    global tabla, lugares_libres, CAPACIDAD
-
+def recoge_tarjeta(hora, num_entrada):
     mutex_lugares.acquire()
 
     row = [
@@ -120,9 +114,6 @@ def recoge_tarjeta(hora, num_entrada): # TODO: completar la función
 
 
 def laser_off_e(hora, num_entrada):
-    global mutex_lugares, cruzando_laser_entrada
-    global tabla, lugares_libres, CAPACIDAD
-
     cruzando_laser_entrada[num_entrada] = True
 
     mutex_lugares.acquire()
@@ -130,7 +121,7 @@ def laser_off_e(hora, num_entrada):
     row = [
         hora,
         f'laserOffE {num_entrada}',
-        f'Auto pasa por entrada {num_entrada}',
+        f'Auto pasando por entrada {num_entrada}',
         lugares_libres,
         CAPACIDAD - lugares_libres]
 
@@ -141,8 +132,7 @@ def laser_off_e(hora, num_entrada):
 
 
 def laser_on_e(hora, num_entrada):
-    global mutex_lugares, mutex_entradas, cruzando_laser_entrada
-    global tabla, lugares_libres, mutex_lugares, CAPACIDAD
+    global lugares_libres
 
     mutex_lugares.acquire()
 
@@ -179,27 +169,27 @@ def laser_on_e(hora, num_entrada):
         tabla.append(row)
 
     mutex_lugares.release()
-    mutex_entradas[num_entrada].release()
+    mutex_entradas[num_entrada - 1].release()
 
 
 
 # Función base para thread de entrada
 
 def entrada(num_entrada):
-    global abierto, mensajes_entrada
-
     while abierto:
         mensaje = mensajes_entrada.get()
 
-        if mensaje[2] == num_entrada:
+        if len(mensaje) > 2 and mensaje[2] == num_entrada:
             if mensaje[1] == 'oprimeBoton':
-                oprimeBoton(mensaje[0], num_entrada)
+                oprime_boton(mensaje[0], num_entrada)
             elif mensaje[1] == 'recojeTarjeta':
-                recojeTarjeta(mensaje[0], num_entrada)
+                recoge_tarjeta(mensaje[0], num_entrada)
             elif mensaje[1] == 'laserOffE':
                 laser_off_e(mensaje[0], num_entrada)
             elif mensaje[1] == 'laserOnE':
                 laser_on_e(mensaje[0], num_entrada)
+            else:
+                mensajes_entrada.put(mensaje)
         else:
             mensajes_entrada.put(mensaje)
 
@@ -212,10 +202,7 @@ def entrada(num_entrada):
 # Funciones necesarias para salida
 
 def mete_tarjeta(hora, num_salida, pagado, hora_pago):
-    global mutex_salidas
-    global tabla, lugares_libres, mutex_lugares, CAPACIDAD
-
-    mutex_salidas[num_salida].acquire()
+    mutex_salidas[num_salida - 1].acquire()
 
     if pagado == 1:
         if hora - hora_pago < 15:     # TODO: Hacer chequeo de hora correcto
@@ -249,9 +236,6 @@ def mete_tarjeta(hora, num_salida, pagado, hora_pago):
 
 
 def laser_off_s(hora, num_salida):
-    global cruzando_laser_salida
-    global tabla, lugares_libres, CAPACIDAD
-
     cruzando_laser_salida[num_salida] = True
 
     mutex_lugares.acquire()
@@ -270,9 +254,6 @@ def laser_off_s(hora, num_salida):
 
 
 def laser_on_s(hora, num_salida):
-    global mutex_salidas, cruzando_laser_salida
-    global tabla, lugares_libres, mutex_lugares, CAPACIDAD
-
     if cruzando_laser_salida[num_salida]:
         mutex_lugares.acquire()
 
@@ -309,7 +290,7 @@ def laser_on_s(hora, num_salida):
 
         tabla.append(row)
 
-    mutex_salidas[num_salida].release()
+    mutex_salidas[num_salida - 1].release()
 
 
 
@@ -321,13 +302,15 @@ def salida(num_salida):
     while abierto:
         mensaje = mensajes_entrada.get()
 
-        if mensaje[2] == num_entrada:
+        if len(mensaje) > 2 and mensaje[2] == num_salida:
             if mensaje[1] == 'meteTarjeta':
-                oprimeBoton(mensaje[0], num_entrada)
+                mete_tarjeta(mensaje[0], num_salida, mensaje[2], mensaje[3])
             elif mensaje[1] == 'laserOffS':
-                laser_off_e(mensaje[0], num_entrada)
+                laser_off_s(mensaje[0], num_salida)
             elif mensaje[1] == 'laserOnS':
-                laser_on_e(mensaje[0], num_entrada)
+                laser_on_s(mensaje[0], num_salida)
+            else:
+                mensajes_entrada.put(mensaje)
         else:
             mensajes_entrada.put(mensaje)
 
@@ -338,34 +321,38 @@ def salida(num_salida):
 # Función para inicializar estacionamiento
 
 def apertura(hora, num_lugares, num_entradas, num_salidas):
-    global abierto, entradas, salidas
-    global mutex_entradas, mutex_salidas
-    global tabla, lugares_libres, mutex_lugares, CAPACIDAD
+    global CAPACIDAD, lugares_libres
+    global abierto, entradas, salidas, mutex_entradas, mutex_salidas
 
     if not abierto:
         abierto = True
-        CAPACIDAD = lugares_libres = num_lugares
+        CAPACIDAD = num_lugares
+        lugares_libres = num_lugares
 
         row = [
             hora,
             f'apertura {num_lugares} {num_entradas} {num_salidas}',
-            f'Auto termina de pasar por salida {num_salida}',
+            f'Se abre el estacionamiento con {num_lugares} lugares, {num_entradas} entradas, y {num_salidas} salidas',
             lugares_libres,
             CAPACIDAD - lugares_libres]
 
         tabla.append(row)
 
         for i in range(num_entradas):
-            entradas[i] = threading.Thread(target=entrada, args=(i,))
+            entradas.append(threading.Thread(target=entrada, args=(i,)))
             entradas[i].start()
 
-            mutex_entradas[i] = threading.Lock()
+            mutex_entradas.append(threading.Lock())
+
+            cruzando_laser_entrada.append(False)
 
         for i in range(num_salidas):
-            salidas[i] = threading.Thread(target=salida, args=(i,))
+            salidas.append(threading.Thread(target=salida, args=(i,)))
             salidas[i].start()
 
-            mutex_salidas[i] = threading.Lock()
+            mutex_salidas.append(threading.Lock())
+
+            cruzando_laser_salida.append(False)
     else:
         mutex_lugares.acquire()
 
@@ -385,12 +372,19 @@ def apertura(hora, num_lugares, num_entradas, num_salidas):
 # Función para cerrar estacionamiento
 
 def cierre(hora):
-    global abierto, entradas, salidas
-    global mutex_entradas, mutex_salidas
-    global tabla, lugares_libres, mutex_lugares, CAPACIDAD
+    global abierto, entradas, salidas, mutex_entradas, mutex_salidas
 
     if abierto:
         abierto = False
+
+        for entrada in entradas:
+            entrada.join()
+
+        for salida in salidas:
+            salida.join()
+
+        mutex_entradas = []
+        mutex_salidas = []
 
         row = [
             hora,
@@ -400,15 +394,6 @@ def cierre(hora):
             CAPACIDAD - lugares_libres]
 
         tabla.append(row)
-
-        mutex_entradas = []
-        mutex_salidas = []
-
-        for entrada in entradas:
-            entrada.join()
-
-        for salida in salidas:
-            salida.join()
     else:
         mutex_lugares.acquire()
 
@@ -437,7 +422,6 @@ class FormatoInvalido(Error):
     pass
 
 def validar_mensajes(mensaje):
-
     es_valido = True
     args = mensaje.split(' ')
 
@@ -542,6 +526,12 @@ def validar_mensajes(mensaje):
                             es_valido = False
                             print(f'Formato numero de estacionamiento en {args[1]} invalido')
                             pass
+                        try:
+                            args[3] = float(args[3])
+                        except ValueError:
+                            es_valido = False
+                            print(f'Formato numero de estacionamiento en {args[1]} invalido')
+                            pass
                 except FormatoInvalido:
                     es_valido = False
                     print(f'Formato de mensaje {args[1]} invalido')
@@ -595,7 +585,25 @@ def validar_mensajes(mensaje):
         print(f'Formato numero de lugares en {args[1]} invalido')
         pass
 
-    return es_valido
+    if es_valido:
+        comando = []
+        comando.append(float(args[0]))
+        comando.append(args[1])
+
+        if len(args) > 2:
+            comando.append(int(args[2]))
+
+        if len(args) > 3:
+            if str(args[3]).find('.') != -1:
+                comando.append(float(args[3]))
+            else:
+                comando.append(int(args[3]))
+
+        if len(args) > 4:
+            comando.append(int(args[4]))
+
+        return comando
+
 
 
 
@@ -604,25 +612,33 @@ def validar_mensajes(mensaje):
 '''
 
 def main(connection):
-    global mensajes_entrada
-
     try:
-        while True:
+        servidor_abierto = True
+
+        while servidor_abierto:
             datos = connection.recv(256)
             mensaje = datos.decode('utf-8')
 
             if mensaje:
-                if validar_mensajes(mensaje):
-                    if not abierto and mensaje[1] == 'apertura':
-                        apertura(mensaje[0], mensaje[2], mensaje[3], mensaje[4])
-                    elif abierto and mensaje[1] == 'cierre':
-                        cierre(mensaje[0])
-                    else:
-                        mensajes_entrada.put(mensaje)
-            else:
-                break
+                comando = validar_mensajes(mensaje)
 
+                if comando:
+                    mensajes_entrada.put(comando)
+
+            if not mensajes_entrada.empty():
+                comando = mensajes_entrada.get()
+
+                if not abierto and comando[1] == 'apertura':
+                    apertura(comando[0], comando[2], comando[3], comando[4])
+                elif abierto and comando[1] == 'cierre':
+                    cierre(comando[0])
+                    servidor_abierto = False
+                else:
+                    mensajes_entrada.put(comando)
+
+            print('\n')
             print(tabulate(tabla, headers='firstrow', tablefmt='orgtbl'))
+            print('\n')
     finally:
         print('closing server')
         connection.close()
